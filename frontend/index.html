@@ -6,252 +6,133 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>公主买买买</title>
     <style>
-        /* ===== 基础布局（桌面 & 通用） ===== */
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "微软雅黑", sans-serif;
-            max-width: 900px;
-            margin: 0 auto;
-            padding: 20px 16px;
-            background: #fafafa;
-            color: #333;
+        /* 允许手机缩放正确布局 */
+        * {
+            box-sizing: border-box;
         }
 
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            margin: 0 auto;
+            padding: 16px;
+            max-width: 900px;
+            background: #fafafa;
+        }
+
+        /* 标题居中，并缩小字体适配手机 */
         h1,
         h2 {
             text-align: center;
-            margin: 0 0 12px;
+            margin: 12px 0;
+            font-size: 22px;
         }
 
-        h1 {
-            font-size: 26px;
-        }
-
-        h2 {
-            font-size: 18px;
-            color: #666;
-        }
-
-        /* ===== 商品列表 ===== */
+        /* 商品列表：两列布局 */
         .products {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 16px;
-            justify-content: center;
-            margin-top: 16px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+            /* minmax宽度可调整大小：改成150/160都行 */
+            gap: 14px;
+            width: 100%;
         }
 
+        /* 每个商品卡片 */
         .product-card {
             background: #fff;
-            border-radius: 8px;
-            padding: 12px;
-            width: 200px;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+            border-radius: 10px;
+            padding: 10px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
             display: flex;
             flex-direction: column;
             align-items: center;
         }
 
+        /* 商品图片 */
         .product-card img {
             width: 100%;
-            border-radius: 6px;
-            margin-bottom: 8px;
-        }
-
-        .product-card-name {
-            font-size: 14px;
-            font-weight: 500;
-            margin-bottom: 4px;
-            text-align: center;
-        }
-
-        .product-card-price {
-            font-size: 14px;
-            color: #ff6f61;
-            margin-bottom: 6px;
-        }
-
-        .product-card button {
-            margin-top: 8px;
-            padding: 6px 10px;
-            border-radius: 4px;
-            border: none;
-            background: #ff6f61;
-            color: #fff;
-            cursor: pointer;
-            font-size: 14px;
-        }
-
-        .product-card button:active {
-            opacity: 0.85;
-        }
-
-        /* ===== 购物车区块 ===== */
-        .cart {
-            margin-top: 24px;
-            background: #fff;
-            padding: 16px;
             border-radius: 8px;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
-            overflow-x: auto;
-            /* 小屏避免表格撑出屏幕 */
+            object-fit: cover;
         }
 
+        /* 商品文字部分 */
+        .product-card p {
+            margin: 6px 0;
+            font-size: 14px;
+            width: 100%;
+        }
+
+        /* 按钮样式 */
+        .product-card button {
+            width: 100%;
+            padding: 10px;
+            background: #ff6f61;
+            border: none;
+            border-radius: 6px;
+            color: white;
+            font-size: 14px;
+            cursor: pointer;
+        }
+
+        /* 🛒购物车 */
+        .cart {
+            margin-top: 20px;
+            background: #fff;
+            padding: 14px;
+            border-radius: 10px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+        }
+
+        /* 表格可滚动，避免手机挤压 */
         .cart table {
             width: 100%;
             border-collapse: collapse;
-            min-width: 480px;
-            /* 手机上可以左右滑动看完整表格 */
+            overflow-x: auto;
+            display: block;
         }
 
         .cart th,
         .cart td {
             padding: 8px;
-            border-bottom: 1px solid #eee;
-            text-align: left;
             font-size: 14px;
-        }
-
-        .cart th {
-            background: #fafafa;
-            font-weight: 500;
+            border-bottom: 1px solid #eee;
         }
 
         .cart-total {
             text-align: right;
-            margin-top: 10px;
+            margin-top: 12px;
             font-weight: bold;
-            font-size: 15px;
         }
 
-        /* ===== 客户信息表单 ===== */
+        /* 用户输入信息 */
         .customer-info {
             margin-top: 20px;
-            display: grid;
-            grid-template-columns: repeat(2, minmax(0, 1fr));
-            /* 桌面两列 */
-            gap: 10px 16px;
-        }
-
-        .customer-info label {
             display: flex;
             flex-direction: column;
-            font-size: 14px;
+            gap: 10px;
         }
 
         .customer-info input {
-            margin-top: 4px;
-            padding: 6px 8px;
-            border-radius: 4px;
+            padding: 8px;
+            border-radius: 6px;
             border: 1px solid #ccc;
             font-size: 14px;
-            box-sizing: border-box;
         }
 
-        /* ===== 提交按钮 & 提示 ===== */
+        /* 提交按钮区域 */
         .submit-btns {
             margin-top: 16px;
             display: flex;
             justify-content: flex-end;
-            gap: 8px;
         }
 
         .submit-btns button {
-            padding: 8px 16px;
-            border-radius: 4px;
-            border: none;
-            cursor: pointer;
-            font-size: 14px;
+            padding: 10px 18px;
             background: #1AAD19;
-            color: #fff;
-        }
-
-        .submit-btns button:active {
-            opacity: 0.9;
-        }
-
-        .msg {
-            margin-top: 10px;
-            color: #e66;
-            font-size: 14px;
-        }
-
-        /* ================= 手机视角优化 ================= */
-        @media (max-width: 768px) {
-            body {
-                max-width: 100%;
-                padding: 12px 10px;
-            }
-
-            h1 {
-                font-size: 22px;
-                margin-bottom: 6px;
-            }
-
-            h2 {
-                font-size: 15px;
-                margin-bottom: 12px;
-            }
-
-            /* 商品：一列铺满屏幕 */
-            .products {
-                flex-direction: column;
-                align-items: stretch;
-                gap: 12px;
-            }
-
-            .product-card {
-                width: 100%;
-                max-width: none;
-                align-items: flex-start;
-            }
-
-            .product-card img {
-                margin-bottom: 6px;
-            }
-
-            /* 购物车卡片收紧一点 */
-            .cart {
-                padding: 12px;
-                margin-top: 18px;
-            }
-
-            .cart th,
-            .cart td {
-                padding: 6px;
-                font-size: 13px;
-            }
-
-            .cart-total {
-                font-size: 14px;
-            }
-
-            /* 客户信息：手机上一列竖排 */
-            .customer-info {
-                grid-template-columns: 1fr;
-                gap: 8px;
-            }
-
-            .customer-info input {
-                font-size: 16px;
-                /* 防止 iOS 自动放大 */
-            }
-
-            /* 按钮改成竖着排，宽度 100% */
-            .submit-btns {
-                flex-direction: column;
-                align-items: stretch;
-                margin-top: 14px;
-            }
-
-            .submit-btns button {
-                width: 100%;
-                font-size: 15px;
-                padding: 10px 0;
-            }
-
-            .msg {
-                font-size: 13px;
-            }
+            color: white;
+            font-size: 16px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
         }
     </style>
 
