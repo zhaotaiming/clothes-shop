@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <title>衣服商城后台管理</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            max-width: 900px;
+            margin: 20px auto;
+        }
+
+        h1 {
+            text-align: center;
+        }
+
+        fieldset {
+            margin-bottom: 24px;
+            padding: 16px;
+        }
+
+        legend {
+            font-weight: bold;
+        }
+
+        label {
+            display: block;
+            margin: 6px 0;
+            font-size: 14px;
+        }
+
+        input,
+        textarea {
+            width: 100%;
+            padding: 6px;
+            box-sizing: border-box;
+            font-size: 14px;
+            margin-top: 2px;
+        }
+
+        textarea {
+            min-height: 60px;
+            resize: vertical;
+        }
+
+        button {
+            margin-top: 10px;
+            padding: 8px 14px;
+            border-radius: 4px;
+            border: none;
+            background: #333;
+            color: #fff;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        button:hover {
+            opacity: 0.9;
+        }
+
+        .msg {
+            margin-top: 6px;
+            font-size: 13px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+            font-size: 13px;
+        }
+
+        th,
+        td {
+            border: 1px solid #ddd;
+            padding: 6px;
+            vertical-align: top;
+        }
+
+        th {
+            background: #f5f5f5;
+        }
+
+        .order-items {
+            font-size: 12px;
+            color: #555;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>衣服商城后台（老板用）</h1>
+
+    <!-- 新增商品 -->
+    <fieldset>
+        <legend>新增商品</legend>
+        <label>管理密码
+            <input type="password" id="pwd-add" placeholder="输入后台密码">
+        </label>
+        <label>商品名
+            <input type="text" id="name" placeholder="例如：法式小众衬衫">
+        </label>
+        <label>价格（元）
+            <input type="number" id="price" placeholder="例如：239">
+        </label>
+        <label>库存数量
+            <input type="number" id="stock" placeholder="例如：10">
+        </label>
+        <label>图片地址（URL，可选）
+            <input type="text" id="image" placeholder="商品图片链接，没有可以先留空">
+        </label>
+        <label>描述（可选）
+            <textarea id="description" placeholder="款式说明、材质、尺码说明等"></textarea>
+        </label>
+        <button onclick="addProduct()">新增商品</button>
+        <div class="msg" id="msg-add"></div>
+    </fieldset>
+
+    <!-- 修改库存 -->
+    <fieldset>
+        <legend>修改库存</legend>
+        <label>管理密码
+            <input type="password" id="pwd-stock" placeholder="输入后台密码">
+        </label>
+        <label>商品ID
+            <input type="number" id="pid" placeholder="要修改的商品 ID">
+        </label>
+        <label>新库存数量
+            <input type="number" id="new-stock" placeholder="改成多少件">
+        </label>
+        <button onclick="updateStock()">修改库存</button>
+        <div class="msg" id="msg-stock"></div>
+    </fieldset>
+
+    <!-- 商品列表（查看商品ID用） -->
+    <fieldset>
+        <legend>商品列表（查看商品 ID / 库存）</legend>
+        <button onclick="loadProductsAdmin()">刷新商品列表</button>
+        <div class="msg" id="msg-products"></div>
+        <div id="products-admin"></div>
+    </fieldset>
+
+
+    <!-- 删除商品 -->
+    <fieldset>
+        <legend>删除商品</legend>
+        <label>管理密码
+            <input type="password" id="pwd-delete" placeholder="输入后台密码">
+        </label>
+        <label>商品ID
+            <input type="number" id="pid-delete" placeholder="要删除的商品 ID">
+        </label>
+        <button onclick="deleteProduct()">删除商品</button>
+        <div class="msg" id="msg-delete"></div>
+    </fieldset>
+
+
+    <!-- 查看订单 -->
+    <fieldset>
+        <legend>查看订单（按下单顺序）</legend>
+        <label>管理密码
+            <input type="password" id="pwd-orders" placeholder="输入后台密码">
+        </label>
+        <button onclick="loadOrders()">加载订单</button>
+        <div class="msg" id="msg-orders"></div>
+        <div id="orders-container"></div>
+    </fieldset>
+
+    <script>
+        async function addProduct() {
+            const body = {
+                password: document.getElementById('pwd-add').value.trim(),
+                name: document.getElementById('name').value.trim(),
+                price: document.getElementById('price').value.trim(),
+                stock: document.getElementById('stock').value.trim(),
+                image: document.getElementById('image').value.trim(),
+                description: document.getElementById('description').value.trim()
+            };
+            const msgEl = document.getElementById('msg-add');
+            msgEl.style.color = 'red';
+            msgEl.textContent = '';
+
+            if (!body.password) {
+                msgEl.textContent = '请先输入管理密码';
+                return;
+            }
+            if (!body.name || !body.price) {
+                msgEl.textContent = '商品名和价格必填';
+                return;
+            }
+
+            try {
+                const res = await fetch('/api/admin/add-product', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body)
+                });
+                const data = await res.json();
+                if (!res.ok) {
+                    msgEl.textContent = data.message || '新增失败';
+                } else {
+                    msgEl.style.color = 'green';
+                    msgEl.textContent = data.message + '（新商品ID：' + data.product.id + '）';
+                    // 清空表单
+                    document.getElementById('name').value = '';
+                    document.getElementById('price').value = '';
+                    document.getElementById('stock').value = '';
+                    document.getElementById('image').value = '';
+                    document.getElementById('description').value = '';
+                }
+            } catch (e) {
+                console.error(e);
+                msgEl.textContent = '网络错误';
+            }
+        }
+
+        async function updateStock() {
+            const body = {
+                password: document.getElementById('pwd-stock').value.trim(),
+                productId: document.getElementById('pid').value.trim(),
+                stock: document.getElementById('new-stock').value.trim()
+            };
+            const msgEl = document.getElementById('msg-stock');
+            msgEl.style.color = 'red';
+            msgEl.textContent = '';
+
+            if (!body.password) {
+                msgEl.textContent = '请先输入管理密码';
+                return;
+            }
+            if (!body.productId || body.stock === '') {
+                msgEl.textContent = '商品ID和库存必填';
+                return;
+            }
+
+            try {
+                const res = await fetch('/api/admin/update-stock', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body)
+                });
+                const data = await res.json();
+                if (!res.ok) {
+                    msgEl.textContent = data.message || '修改失败';
+                } else {
+                    msgEl.style.color = 'green';
+                    msgEl.textContent = data.message;
+                }
+            } catch (e) {
+                console.error(e);
+                msgEl.textContent = '网络错误';
+            }
+        }
+
+        async function deleteProduct() {
+            const body = {
+                password: document.getElementById('pwd-delete').value.trim(),
+                productId: document.getElementById('pid-delete').value.trim()
+            };
+            const msgEl = document.getElementById('msg-delete');
+            msgEl.style.color = 'red';
+            msgEl.textContent = '';
+
+            if (!body.password) {
+                msgEl.textContent = '请先输入管理密码';
+                return;
+            }
+            if (!body.productId) {
+                msgEl.textContent = '商品ID必填';
+                return;
+            }
+
+            if (!confirm(`确定要删除商品 ID：${body.productId} 吗？该操作不可恢复。`)) {
+                return;
+            }
+
+            try {
+                const res = await fetch('/api/admin/delete-product', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body)
+                });
+                const data = await res.json();
+                if (!res.ok) {
+                    msgEl.textContent = data.message || '删除失败';
+                } else {
+                    msgEl.style.color = 'green';
+                    msgEl.textContent = data.message;
+                    // 清空输入
+                    document.getElementById('pid-delete').value = '';
+                }
+            } catch (e) {
+                console.error(e);
+                msgEl.textContent = '网络错误';
+            }
+        }
+
+        async function loadProductsAdmin() {
+            const msgEl = document.getElementById('msg-products');
+            const container = document.getElementById('products-admin');
+            msgEl.style.color = 'red';
+            msgEl.textContent = '';
+            container.innerHTML = '';
+
+            try {
+                const res = await fetch('/api/products');
+                const data = await res.json();
+
+                if (!res.ok) {
+                    msgEl.textContent = '加载商品失败';
+                    return;
+                }
+
+                if (!Array.isArray(data) || data.length === 0) {
+                    msgEl.style.color = '#333';
+                    msgEl.textContent = '目前还没有商品';
+                    return;
+                }
+
+                msgEl.style.color = '#333';
+                msgEl.textContent = `共 ${data.length} 个商品`;
+
+                const table = document.createElement('table');
+                table.style.width = '100%';
+                table.style.borderCollapse = 'collapse';
+                table.innerHTML = `
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>名称</th>
+              <th>价格</th>
+              <th>库存</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        `;
+                const tbody = table.querySelector('tbody');
+
+                data.forEach(p => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+            <td>${p.id}</td>
+            <td>${p.name}</td>
+            <td>￥${p.price}</td>
+            <td>${typeof p.stock === 'number' ? p.stock : '（未设置）'}</td>
+          `;
+                    tbody.appendChild(tr);
+                });
+
+                container.appendChild(table);
+
+            } catch (e) {
+                console.error(e);
+                msgEl.textContent = '网络错误，无法加载商品';
+            }
+        }
+
+
+        async function loadOrders() {
+            const pwd = document.getElementById('pwd-orders').value.trim();
+            const msgEl = document.getElementById('msg-orders');
+            const container = document.getElementById('orders-container');
+            msgEl.style.color = 'red';
+            msgEl.textContent = '';
+            container.innerHTML = '';
+
+            if (!pwd) {
+                msgEl.textContent = '请先输入管理密码';
+                return;
+            }
+
+            try {
+                const res = await fetch('/api/admin/orders?password=' + encodeURIComponent(pwd));
+                const data = await res.json();
+                if (!res.ok) {
+                    msgEl.textContent = data.message || '加载失败';
+                    return;
+                }
+
+                if (!Array.isArray(data) || data.length === 0) {
+                    msgEl.style.color = '#333';
+                    msgEl.textContent = '目前还没有订单';
+                    return;
+                }
+
+                msgEl.style.color = 'green';
+                msgEl.textContent = `共 ${data.length} 笔订单`;
+
+                // 按 id 排序（1、2、3…就是下单顺序）
+                data.sort((a, b) => a.id - b.id);
+
+                const table = document.createElement('table');
+                table.innerHTML = `
+          <thead>
+            <tr>
+              <th>订单ID</th>
+              <th>下单时间</th>
+              <th>顾客信息</th>
+              <th>购买内容</th>
+              <th>状态</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        `;
+                const tbody = table.querySelector('tbody');
+
+                data.forEach(order => {
+                    const tr = document.createElement('tr');
+                    const created = order.createdAt ? new Date(order.createdAt).toLocaleString() : '';
+
+                    const customerInfo = order.customer ? `
+            姓名：${order.customer.name || ''}
+          ` : '';
+
+                    const itemsHtml = Array.isArray(order.items)
+                        ? order.items.map(it => `${it.name} × ${it.quantity}（￥${it.price}）`).join('<br>')
+                        : '';
+
+                    tr.innerHTML = `
+            <td>${order.id}</td>
+            <td>${created}</td>
+            <td>${customerInfo}</td>
+            <td class="order-items">${itemsHtml}</td>
+            <td>${order.status || ''}</td>
+          `;
+                    tbody.appendChild(tr);
+                });
+
+                container.appendChild(table);
+
+            } catch (e) {
+                console.error(e);
+                msgEl.textContent = '网络错误';
+            }
+        }
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,13 @@
+{
+    "name": "clothes-shop",
+    "version": "1.0.0",
+    "description": "Simple clothes web shop with frontend and backend",
+    "main": "backend/server.js",
+    "scripts": {
+        "start": "node backend/server.js"
+    },
+    "dependencies": {
+        "cors": "^2.8.5",
+        "express": "^4.19.0"
+    }
+}

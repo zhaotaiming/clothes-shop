@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <title>订单查询</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 450px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        input {
+            width: 100%;
+            padding: 10px;
+            margin-top: 10px;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+        }
+
+        button {
+            width: 100%;
+            margin-top: 15px;
+            padding: 12px;
+            font-size: 16px;
+            background: #1AAD19;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+
+        .order-box {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f9f9f9;
+            border-radius: 8px;
+        }
+
+        .status {
+            font-weight: bold;
+            color: #ff6f61;
+        }
+    </style>
+</head>
+
+<body>
+    <h2>查询订单</h2>
+    <input type="text" id="orderId" placeholder="请输入订单号">
+    <button onclick="checkOrder()">查询</button>
+
+    <div id="result"></div>
+
+    <script>
+        async function checkOrder() {
+            const id = document.getElementById('orderId').value.trim();
+            const resultDiv = document.getElementById('result');
+
+            if (!id) {
+                resultDiv.innerHTML = "<p style='color:red;'>请输入订单号</p>";
+                return;
+            }
+
+            try {
+                const res = await fetch(`/api/orders/${id}`);
+                if (!res.ok) {
+                    resultDiv.innerHTML = "<p style='color:red;'>没有找到这个订单</p>";
+                    return;
+                }
+                const order = await res.json();
+
+                let html = `
+        <div class="order-box">
+          <p>订单号：${order.id}</p>
+          <p>姓名：${order.customer.name}</p>
+          <p>下单时间：${new Date(order.createdAt).toLocaleString()}</p>
+          <p>订单状态：<span class="status">${order.status}</span></p>
+          <hr>
+          <strong>商品明细：</strong><br><br>
+        `;
+
+                order.items.forEach(item => {
+                    html += `<p>${item.name} × ${item.quantity} — ￥${item.price * item.quantity}</p>`;
+                });
+
+                html += `
+          <hr>
+          <p><strong>总金额：￥${order.items.reduce((t, a) => t + a.price * a.quantity, 0)}</strong></p>
+        </div>`;
+
+                resultDiv.innerHTML = html;
+            } catch (err) {
+                resultDiv.innerHTML = "<p style='color:red;'>查询出错，请稍后再试</p>";
+            }
+        }
+    </script>
+</body>
+
+</html>
