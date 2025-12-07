@@ -3,6 +3,7 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
+const mongoose = require('mongoose'); // ← 新增：引入 mongoose
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -13,6 +14,46 @@ const ADMIN_PASSWORD = '123';
 app.use(cors());
 app.use(express.json());
 
+// =================== MongoDB 连接 ===================
+
+// 优先使用环境变量中的 MONGODB_URI（Render 上配置）
+// 本地没有环境变量时，自动退回到本机 MongoDB
+const MONGODB_URI =
+    process.env.MONGODB_URI ||
+    'mongodb+srv://lele:Zhao1123@cluster0.uwfmmiy.mongodb.net/clothes_shop?appName=Cluster0';
+
+
+mongoose
+    .connect(MONGODB_URI)
+    .then(() => {
+        console.log('✅ MongoDB connected');
+    })
+    .catch((err) => {
+        console.error('❌ MongoDB connection error:', err);
+    });
+
+// =================== MongoDB 订单模型 ===================
+
+const orderSchema = new mongoose.Schema({
+    id: { type: Number, index: true }, // 自增订单号
+    customer: {
+        name: String,
+    },
+    items: [
+        {
+            name: String,
+            price: Number,
+            quantity: Number,
+        },
+    ],
+    status: { type: String, default: '已下单' },
+    createdAt: { type: Date, default: Date.now },
+});
+
+const Order = mongoose.model('Order', orderSchema);
+
+// =================== 商品文件相关 ===================
+
 // 商品数据文件路径
 const productsFilePath = path.join(__dirname, 'products.json');
 
@@ -21,9 +62,6 @@ function loadProducts() {
     const data = fs.readFileSync(productsFilePath, 'utf-8');
     return JSON.parse(data);
 }
-
-// 暂存订单（简单版：只存在内存里）
-const orders = [];
 
 // =================== 正常给顾客用的接口 ===================
 
@@ -38,46 +76,59 @@ app.get('/api/products', (req, res) => {
     }
 });
 
-// 创建订单（当前不扣库存，只是记录一下）
-app.post('/api/orders', (req, res) => {
-    const { items, customer } = req.body;
+// 创建订单（写入 MongoDB）
+app.post('/api/orders', async (req, res) => {
+    try {
+        const { items, customer } = req.body;
 
-    if (!items || !Array.isArray(items) || items.length === 0) {
-        return res.status(400).json({ message: '订单为空' });
+        if (!items || !Array.isArray(items) || items.length === 0) {
+            return res.status(400).json({ message: '订单为空' });
+        }
+        // ✅ 只要求姓名
+        if (!customer || !customer.name) {
+            return res.status(400).json({ message: '请填写姓名' });
+        }
+
+        // 找到当前最大订单号，自增生成新的 id
+        const lastOrder = await Order.findOne().sort({ id: -1 }).lean();
+        const newId = lastOrder ? lastOrder.id + 1 : 1;
+
+        const newOrder = await Order.create({
+            id: newId,
+            items,
+            customer,
+            status: '已下单',
+        });
+
+        console.log('收到新订单：', newOrder);
+
+        res.json({
+            message: '订单已创建（当前为测试环境，未实际发起支付）',
+            orderId: newOrder.id,
+        });
+    } catch (err) {
+        console.error('创建订单失败:', err);
+        res.status(500).json({ message: '服务器错误：创建订单失败' });
     }
-    // ✅ 只要求姓名，手机号/地址/备注都可省略
-    if (!customer || !customer.name) {
-        return res.status(400).json({ message: '请填写姓名' });
-    }
-
-    const newOrder = {
-        id: orders.length + 1,
-        items,
-        customer,
-        status: '已下单',
-        createdAt: new Date().toISOString()
-    };
-
-    orders.push(newOrder);
-    console.log('收到新订单：', newOrder);
-
-    res.json({
-        message: '订单已创建（当前为测试环境，未实际发起支付）',
-        orderId: newOrder.id
-    });
 });
 
+// =================== 老板后台接口 ===================
 
-// （可选）给你自己看的简单订单列表接口（以后可以单独做老板页面用）
-app.get('/api/admin/orders', (req, res) => {
+// （老板）获取所有订单（按下单顺序）
+app.get('/api/admin/orders', async (req, res) => {
     const pwd = req.query.password;
     if (pwd !== ADMIN_PASSWORD) {
         return res.status(403).json({ message: '管理密码错误' });
     }
-    res.json(orders);
-});
 
-// =================== 老板后台接口 ===================
+    try {
+        const allOrders = await Order.find().sort({ id: 1 }).lean();
+        res.json(allOrders);
+    } catch (err) {
+        console.error('获取订单失败:', err);
+        res.status(500).json({ message: '无法获取订单列表' });
+    }
+});
 
 // 新增商品
 app.post('/api/admin/add-product', (req, res) => {
@@ -99,7 +150,7 @@ app.post('/api/admin/add-product', (req, res) => {
         return res.status(500).json({ message: '无法读取商品列表' });
     }
 
-    const newId = products.length > 0 ? Math.max(...products.map(p => p.id)) + 1 : 1;
+    const newId = products.length > 0 ? Math.max(...products.map((p) => p.id)) + 1 : 1;
 
     const newProduct = {
         id: newId,
@@ -107,7 +158,7 @@ app.post('/api/admin/add-product', (req, res) => {
         price: Number(price),
         stock: stock ? Number(stock) : 0,
         image: image || '',
-        description: description || ''
+        description: description || '',
     };
 
     products.push(newProduct);
@@ -139,7 +190,7 @@ app.post('/api/admin/update-stock', (req, res) => {
     }
 
     const pid = Number(productId);
-    const p = products.find(prod => prod.id === pid);
+    const p = products.find((prod) => prod.id === pid);
     if (!p) {
         return res.status(404).json({ message: `未找到商品ID：${productId}` });
     }
@@ -177,7 +228,7 @@ app.post('/api/admin/delete-product', (req, res) => {
     }
 
     const pid = Number(productId);
-    const index = products.findIndex(p => p.id === pid);
+    const index = products.findIndex((p) => p.id === pid);
 
     if (index === -1) {
         return res.status(404).json({ message: `未找到商品ID：${productId}` });
@@ -195,81 +246,115 @@ app.post('/api/admin/delete-product', (req, res) => {
     res.json({ message: `已删除商品「${removed.name}」（ID：${removed.id}）` });
 });
 
-
 // =================== 静态前端页面 ===================
 
 app.use('/', express.static(path.join(__dirname, '..', 'frontend')));
 
-app.get('/api/orders/:id', (req, res) => {
-    const orderId = Number(req.params.id);
-    const order = orders.find(o => o.id === orderId);
+// =================== 订单相关附加接口 ===================
 
-    if (!order) {
-        return res.status(404).json({ message: '订单不存在' });
+// 按 ID 查询单个订单（用户自己查）
+app.get('/api/orders/:id', async (req, res) => {
+    try {
+        const orderId = Number(req.params.id);
+        const order = await Order.findOne({ id: orderId }).lean();
+
+        if (!order) {
+            return res.status(404).json({ message: '订单不存在' });
+        }
+
+        res.json(order);
+    } catch (err) {
+        console.error('查询订单失败:', err);
+        res.status(500).json({ message: '服务器错误' });
     }
-
-    res.json(order);
 });
 
-// 新接口：提供脱敏后的订单列表给前台显示
-app.get('/api/public-orders', (req, res) => {
-    const maskedOrders = orders.map(order => ({
-        id: order.id,
-        name: maskName(order.customer.name),
-        createdAt: order.createdAt,
-        status: order.status || '已下单',
-        items: order.items.map(i => `${i.name}×${i.quantity}`)
-    }));
+// 姓名脱敏函数：小王撒 → 小**
+function maskName(name) {
+    if (!name) return '';
+    if (name.length === 1) return name + '*';
+    return name[0] + '*'.repeat(name.length - 1);
+}
 
-    res.json(maskedOrders);
+// 公开订单列表（主页展示用，姓名脱敏）
+app.get('/api/public-orders', async (req, res) => {
+    try {
+        const allOrders = await Order.find().sort({ id: 1 }).lean();
+
+        const maskedOrders = allOrders.map((order) => ({
+            id: order.id,
+            name: maskName(order.customer?.name),
+            createdAt: order.createdAt,
+            status: order.status || '已下单',
+            items: (order.items || []).map((i) => `${i.name}×${i.quantity || 1}`),
+        }));
+
+        res.json(maskedOrders);
+    } catch (err) {
+        console.error('获取公开订单失败:', err);
+        res.status(500).json({ message: '无法获取订单' });
+    }
 });
 
-app.post('/api/admin/update-order-status', (req, res) => {
-    const { password, orderId, status } = req.body;
+// 老板修改订单状态
+app.post('/api/admin/update-order-status', async (req, res) => {
+    try {
+        const { password, orderId, status } = req.body;
 
-    if (password !== ADMIN_PASSWORD) {
-        return res.status(403).json({ message: '管理密码错误' });
+        if (password !== ADMIN_PASSWORD) {
+            return res.status(403).json({ message: '管理密码错误' });
+        }
+
+        const allowStatus = ['已下单', '已付款'];
+        if (!allowStatus.includes(status)) {
+            return res.status(400).json({ message: '不支持的状态值' });
+        }
+
+        const id = Number(orderId);
+        const order = await Order.findOneAndUpdate(
+            { id },
+            { status },
+            { new: true }
+        ).lean();
+
+        if (!order) {
+            return res.status(404).json({ message: `未找到订单ID：${orderId}` });
+        }
+
+        res.json({ message: `订单 ${order.id} 状态已更新为「${status}」` });
+    } catch (err) {
+        console.error('更新订单状态失败:', err);
+        res.status(500).json({ message: '服务器错误' });
     }
-
-    const allowStatus = ['已下单', '已付款'];
-    if (!allowStatus.includes(status)) {
-        return res.status(400).json({ message: '不支持的状态值' });
-    }
-
-    const id = Number(orderId);
-    const order = orders.find(o => o.id === id);
-
-    if (!order) {
-        return res.status(404).json({ message: `未找到订单ID：${orderId}` });
-    }
-
-    order.status = status;
-    res.json({ message: `订单 ${order.id} 状态已更新为「${status}」` });
 });
 
 // 老板删除订单
-app.post('/api/admin/delete-order', (req, res) => {
-    const { password, orderId } = req.body;
+app.post('/api/admin/delete-order', async (req, res) => {
+    try {
+        const { password, orderId } = req.body;
 
-    if (password !== ADMIN_PASSWORD) {
-        return res.status(403).json({ message: '管理密码错误' });
+        if (password !== ADMIN_PASSWORD) {
+            return res.status(403).json({ message: '管理密码错误' });
+        }
+
+        const id = Number(orderId);
+        const removed = await Order.findOneAndDelete({ id }).lean();
+
+        if (!removed) {
+            return res.status(404).json({ message: `未找到订单ID：${orderId}` });
+        }
+
+        res.json({
+            message: `已删除订单 ${removed.id}（${removed.customer?.name || ''}）`,
+        });
+    } catch (err) {
+        console.error('删除订单失败:', err);
+        res.status(500).json({ message: '服务器错误' });
     }
-
-    const id = Number(orderId);
-    const index = orders.findIndex(o => o.id === id);
-
-    if (index === -1) {
-        return res.status(404).json({ message: `未找到订单ID：${orderId}` });
-    }
-
-    const removed = orders.splice(index, 1)[0];
-
-    res.json({ message: `已删除订单 ${removed.id}（${removed.customer?.name || ''}）` });
 });
 
 // 老板导出订单为 CSV（Excel 可直接打开）
-// 一行代表一件商品，同一订单第二行开始不重复显示用户信息
-app.get('/api/admin/export-orders', (req, res) => {
+app.get('/api/admin/export-orders', async (req, res) => {
     const pwd = req.query.password;
     if (pwd !== ADMIN_PASSWORD) {
         return res.status(403).send('管理密码错误');
@@ -285,55 +370,53 @@ app.get('/api/admin/export-orders', (req, res) => {
     // CSV 表头
     let csv = '订单ID,姓名,状态,下单时间,商品名称\r\n';
 
-    if (orders && orders.length > 0) {
-        orders.forEach(order => {
-            const id = escape(order.id);
-            const name = escape(order.customer?.name || '');
-            const status = escape(order.status || '已下单');
-            const time = escape(order.createdAt ? new Date(order.createdAt).toLocaleString() : '');
+    try {
+        const orders = await Order.find().sort({ id: 1 }).lean();
 
-            if (Array.isArray(order.items) && order.items.length > 0) {
+        if (orders && orders.length > 0) {
+            orders.forEach((order) => {
+                const id = escape(order.id);
+                const name = escape(order.customer?.name || '');
+                const status = escape(order.status || '已下单');
+                const time = escape(
+                    order.createdAt
+                        ? new Date(order.createdAt).toLocaleString()
+                        : ''
+                );
 
-                // 第一件商品保留所有信息
-                csv += [
-                    id, name, status, time, escape(order.items[0].name)
-                ].join(',') + '\r\n';
+                if (Array.isArray(order.items) && order.items.length > 0) {
+                    // 第一件商品保留所有信息
+                    csv += [id, name, status, time, escape(order.items[0].name)].join(
+                        ','
+                    ) + '\r\n';
 
-                // 后续商品只显示商品列
-                for (let i = 1; i < order.items.length; i++) {
-                    csv += [
-                        '', '', '', '', escape(order.items[i].name)
-                    ].join(',') + '\r\n';
+                    // 后续商品只显示商品列
+                    for (let i = 1; i < order.items.length; i++) {
+                        csv += ['', '', '', '', escape(order.items[i].name)].join(
+                            ','
+                        ) + '\r\n';
+                    }
+                } else {
+                    // 没有商品也空着
+                    csv += `${id},${name},${status},${time},""\r\n`;
                 }
+            });
+        }
 
-            } else {
-                // 没有商品也为空占位
-                csv += `${id},${name},${status},${time},""\r\n`;
-            }
-        });
+        res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+        res.setHeader(
+            'Content-Disposition',
+            'attachment; filename="orders.csv"'
+        );
+        // 加上 BOM 让 Excel 正常显示中文
+        res.send('\uFEFF' + csv);
+    } catch (err) {
+        console.error('导出订单失败:', err);
+        res.status(500).send('导出失败');
     }
-
-    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-    res.setHeader('Content-Disposition', 'attachment; filename="orders.csv"');
-    res.send('\uFEFF' + csv);
 });
 
-
-
-function maskName(name) {
-    if (!name) return '';
-    if (name.length === 1) return name + '*';
-    return name[0] + '*'.repeat(name.length - 1);
-}
-
-
-function maskName(name) {
-    if (!name) return '';
-    if (name.length === 1) return name + '*';
-    return name[0] + '*'.repeat(name.length - 1);
-}
-
-
+// =================== 启动服务器 ===================
 
 app.listen(PORT, () => {
     console.log(`服务器已启动：http://localhost:${PORT}`);
