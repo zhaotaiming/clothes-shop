@@ -54,7 +54,7 @@ app.post('/api/orders', (req, res) => {
         id: orders.length + 1,
         items,
         customer,
-        status: 'pending',
+        status: '已下单',
         createdAt: new Date().toISOString()
     };
 
@@ -210,6 +210,129 @@ app.get('/api/orders/:id', (req, res) => {
 
     res.json(order);
 });
+
+// 新接口：提供脱敏后的订单列表给前台显示
+app.get('/api/public-orders', (req, res) => {
+    const maskedOrders = orders.map(order => ({
+        id: order.id,
+        name: maskName(order.customer.name),
+        createdAt: order.createdAt,
+        status: order.status || '已下单',
+        items: order.items.map(i => `${i.name}×${i.quantity}`)
+    }));
+
+    res.json(maskedOrders);
+});
+
+app.post('/api/admin/update-order-status', (req, res) => {
+    const { password, orderId, status } = req.body;
+
+    if (password !== ADMIN_PASSWORD) {
+        return res.status(403).json({ message: '管理密码错误' });
+    }
+
+    const allowStatus = ['已下单', '已付款'];
+    if (!allowStatus.includes(status)) {
+        return res.status(400).json({ message: '不支持的状态值' });
+    }
+
+    const id = Number(orderId);
+    const order = orders.find(o => o.id === id);
+
+    if (!order) {
+        return res.status(404).json({ message: `未找到订单ID：${orderId}` });
+    }
+
+    order.status = status;
+    res.json({ message: `订单 ${order.id} 状态已更新为「${status}」` });
+});
+
+// 老板删除订单
+app.post('/api/admin/delete-order', (req, res) => {
+    const { password, orderId } = req.body;
+
+    if (password !== ADMIN_PASSWORD) {
+        return res.status(403).json({ message: '管理密码错误' });
+    }
+
+    const id = Number(orderId);
+    const index = orders.findIndex(o => o.id === id);
+
+    if (index === -1) {
+        return res.status(404).json({ message: `未找到订单ID：${orderId}` });
+    }
+
+    const removed = orders.splice(index, 1)[0];
+
+    res.json({ message: `已删除订单 ${removed.id}（${removed.customer?.name || ''}）` });
+});
+
+// 老板导出订单为 CSV（Excel 可直接打开）
+// 一行代表一件商品，同一订单第二行开始不重复显示用户信息
+app.get('/api/admin/export-orders', (req, res) => {
+    const pwd = req.query.password;
+    if (pwd !== ADMIN_PASSWORD) {
+        return res.status(403).send('管理密码错误');
+    }
+
+    // 转义函数，避免 CSV 解析问题
+    const escape = (str) => {
+        if (str === null || str === undefined) return '';
+        str = String(str).replace(/"/g, '""');
+        return `"${str}"`;
+    };
+
+    // CSV 表头
+    let csv = '订单ID,姓名,状态,下单时间,商品名称\r\n';
+
+    if (orders && orders.length > 0) {
+        orders.forEach(order => {
+            const id = escape(order.id);
+            const name = escape(order.customer?.name || '');
+            const status = escape(order.status || '已下单');
+            const time = escape(order.createdAt ? new Date(order.createdAt).toLocaleString() : '');
+
+            if (Array.isArray(order.items) && order.items.length > 0) {
+
+                // 第一件商品保留所有信息
+                csv += [
+                    id, name, status, time, escape(order.items[0].name)
+                ].join(',') + '\r\n';
+
+                // 后续商品只显示商品列
+                for (let i = 1; i < order.items.length; i++) {
+                    csv += [
+                        '', '', '', '', escape(order.items[i].name)
+                    ].join(',') + '\r\n';
+                }
+
+            } else {
+                // 没有商品也为空占位
+                csv += `${id},${name},${status},${time},""\r\n`;
+            }
+        });
+    }
+
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', 'attachment; filename="orders.csv"');
+    res.send('\uFEFF' + csv);
+});
+
+
+
+function maskName(name) {
+    if (!name) return '';
+    if (name.length === 1) return name + '*';
+    return name[0] + '*'.repeat(name.length - 1);
+}
+
+
+function maskName(name) {
+    if (!name) return '';
+    if (name.length === 1) return name + '*';
+    return name[0] + '*'.repeat(name.length - 1);
+}
+
 
 
 app.listen(PORT, () => {

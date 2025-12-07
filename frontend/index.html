@@ -3,7 +3,7 @@
 
 <head>
     <meta charset="UTF-8" />
-    <title>衣服小商城</title>
+    <title>公主买买买</title>
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -124,7 +124,7 @@
 </head>
 
 <body>
-    <h1>衣服小商城（Demo）</h1>
+    <h1>Andmary新品下单</h1>
 
     <h2>商品列表</h2>
     <div class="products" id="products"></div>
@@ -159,6 +159,10 @@
         </div>
         <div class="msg" id="message"></div>
     </div>
+
+    <h2 style="margin-top:30px;">下单顺序（实时更新）</h2>
+    <div id="order-rank">加载中...</div>
+
 
     <script>
         const API_BASE = ''; // 同一域名下，留空即可
@@ -291,7 +295,7 @@
                 }
 
                 msgEl.style.color = '#1AAD19';
-                msgEl.innerText = `下单成功！（订单号：${data.orderId}）。当前为测试状态，未实际发起支付。`;
+                msgEl.innerText = `下单成功！（订单号：${data.orderId}）。`;
 
                 // 提交成功后清空购物车
                 cart = [];
@@ -303,7 +307,52 @@
             }
         }
 
+        async function loadOrderRank() {
+            try {
+                const res = await fetch('/api/public-orders');
+                const data = await res.json();
+
+                const box = document.getElementById('order-rank');
+
+                if (!data.length) {
+                    box.innerHTML = "还没有人下单~ 🧸";
+                    return;
+                }
+
+                let html = "<ul style='list-style:none;padding:0;font-size:15px;'>";
+
+                data.forEach(o => {
+                    const itemsText = o.items.join(" | ");
+
+                    html += `
+        <li style="margin:10px 0;padding:8px;background:#fff;border-radius:6px;">
+          <div><strong>#${o.id}</strong>  ${o.name}</div>
+          <div style="color:#444;font-size:14px;margin-top:4px;">
+            🛍 ${itemsText}
+          </div>
+          <div style="color:gray;font-size:12px;margin-top:3px;">
+            ${new Date(o.createdAt).toLocaleString()}
+          </div>
+        </li>
+      `;
+                });
+
+                html += "</ul>";
+                box.innerHTML = html;
+
+            } catch (e) {
+                document.getElementById('order-rank').innerHTML = "加载失败，请刷新";
+            }
+        }
+
+
         loadProducts();
+        // 页面加载的时候自动显示
+        loadOrderRank();
+
+
+        // 每60秒自动刷新一次
+        setInterval(loadOrderRank, 60000);
     </script>
 </body>
 

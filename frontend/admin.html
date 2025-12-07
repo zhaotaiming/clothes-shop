@@ -99,19 +99,19 @@
             <input type="password" id="pwd-add" placeholder="输入后台密码">
         </label>
         <label>商品名
-            <input type="text" id="name" placeholder="例如：法式小众衬衫">
+            <input type="text" id="name" placeholder="">
         </label>
         <label>价格（元）
-            <input type="number" id="price" placeholder="例如：239">
+            <input type="number" id="price" placeholder="">
         </label>
         <label>库存数量
-            <input type="number" id="stock" placeholder="例如：10">
+            <input type="number" id="stock" placeholder="0">
         </label>
         <label>图片地址（URL，可选）
-            <input type="text" id="image" placeholder="商品图片链接，没有可以先留空">
+            <input type="text" id="image" placeholder="">
         </label>
         <label>描述（可选）
-            <textarea id="description" placeholder="款式说明、材质、尺码说明等"></textarea>
+            <textarea id="description" placeholder=""></textarea>
         </label>
         <button onclick="addProduct()">新增商品</button>
         <div class="msg" id="msg-add"></div>
@@ -127,7 +127,7 @@
             <input type="number" id="pid" placeholder="要修改的商品 ID">
         </label>
         <label>新库存数量
-            <input type="number" id="new-stock" placeholder="改成多少件">
+            <input type="number" id="new-stock" placeholder="">
         </label>
         <button onclick="updateStock()">修改库存</button>
         <div class="msg" id="msg-stock"></div>
@@ -163,6 +163,7 @@
             <input type="password" id="pwd-orders" placeholder="输入后台密码">
         </label>
         <button onclick="loadOrders()">加载订单</button>
+        <button onclick="exportOrders()" style="margin-left:8px;">导出Excel</button>
         <div class="msg" id="msg-orders"></div>
         <div id="orders-container"></div>
     </fieldset>
@@ -356,7 +357,6 @@
             }
         }
 
-
         async function loadOrders() {
             const pwd = document.getElementById('pwd-orders').value.trim();
             const msgEl = document.getElementById('msg-orders');
@@ -392,16 +392,17 @@
 
                 const table = document.createElement('table');
                 table.innerHTML = `
-          <thead>
-            <tr>
-              <th>订单ID</th>
-              <th>下单时间</th>
-              <th>顾客信息</th>
-              <th>购买内容</th>
-              <th>状态</th>
-            </tr>
-          </thead>
-          <tbody></tbody>
+            <thead>
+                <tr>
+                <th>订单ID</th>
+                <th>下单时间</th>
+                <th>顾客信息</th>
+                <th>购买内容</th>
+                <th>状态</th>
+                <th>操作</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
         `;
                 const tbody = table.querySelector('tbody');
 
@@ -418,12 +419,21 @@
                         : '';
 
                     tr.innerHTML = `
-            <td>${order.id}</td>
-            <td>${created}</td>
-            <td>${customerInfo}</td>
-            <td class="order-items">${itemsHtml}</td>
-            <td>${order.status || ''}</td>
-          `;
+    <td>${order.id}</td>
+    <td>${created}</td>
+    <td>${customerInfo}</td>
+    <td class="order-items">${itemsHtml}</td>
+    <td>
+        <select onchange="changeOrderStatus(${order.id}, this.value)">
+            <option value="已下单" ${order.status === '已下单' ? 'selected' : ''}>已下单</option>
+            <option value="已付款" ${order.status === '已付款' ? 'selected' : ''}>已付款</option>
+        </select>
+    </td>
+    <td>
+        <button type="button" onclick="deleteOrder(${order.id})">删除</button>
+    </td>
+`;
+
                     tbody.appendChild(tr);
                 });
 
@@ -434,6 +444,57 @@
                 msgEl.textContent = '网络错误';
             }
         }
+
+        async function deleteOrder(orderId) {
+            const pwd = document.getElementById('pwd-orders').value.trim();
+            const msgEl = document.getElementById('msg-orders');
+
+            if (!pwd) {
+                alert('请先在上面输入管理密码，再操作删除订单');
+                return;
+            }
+
+            if (!confirm(`确定要删除订单 ${orderId} 吗？该操作不可恢复。`)) {
+                return;
+            }
+
+            try {
+                const res = await fetch('/api/admin/delete-order', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        password: pwd,
+                        orderId: orderId
+                    })
+                });
+
+                const data = await res.json();
+                if (!res.ok) {
+                    alert(data.message || '删除失败');
+                } else {
+                    msgEl.style.color = 'green';
+                    msgEl.textContent = data.message;
+                    // 删除成功后刷新订单列表
+                    loadOrders();
+                }
+            } catch (e) {
+                console.error(e);
+                alert('网络错误，稍后再试');
+            }
+        }
+
+        function exportOrders() {
+            const pwd = document.getElementById('pwd-orders').value.trim();
+            if (!pwd) {
+                alert('请先输入管理密码');
+                return;
+            }
+
+            // 通过在新窗口打开下载链接的方式导出
+            const url = '/api/admin/export-orders?password=' + encodeURIComponent(pwd);
+            window.open(url, '_blank');
+        }
+
     </script>
 </body>
 
