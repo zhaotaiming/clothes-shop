@@ -3,26 +3,41 @@
 
 <head>
     <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>公主买买买</title>
     <style>
+        /* ===== 基础布局（桌面 & 通用） ===== */
         body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "微软雅黑", sans-serif;
             max-width: 900px;
             margin: 0 auto;
-            padding: 20px;
+            padding: 20px 16px;
             background: #fafafa;
+            color: #333;
         }
 
         h1,
         h2 {
             text-align: center;
+            margin: 0 0 12px;
         }
 
+        h1 {
+            font-size: 26px;
+        }
+
+        h2 {
+            font-size: 18px;
+            color: #666;
+        }
+
+        /* ===== 商品列表 ===== */
         .products {
             display: flex;
             flex-wrap: wrap;
             gap: 16px;
             justify-content: center;
+            margin-top: 16px;
         }
 
         .product-card {
@@ -42,6 +57,19 @@
             margin-bottom: 8px;
         }
 
+        .product-card-name {
+            font-size: 14px;
+            font-weight: 500;
+            margin-bottom: 4px;
+            text-align: center;
+        }
+
+        .product-card-price {
+            font-size: 14px;
+            color: #ff6f61;
+            margin-bottom: 6px;
+        }
+
         .product-card button {
             margin-top: 8px;
             padding: 6px 10px;
@@ -50,19 +78,29 @@
             background: #ff6f61;
             color: #fff;
             cursor: pointer;
+            font-size: 14px;
         }
 
+        .product-card button:active {
+            opacity: 0.85;
+        }
+
+        /* ===== 购物车区块 ===== */
         .cart {
-            margin-top: 30px;
+            margin-top: 24px;
             background: #fff;
             padding: 16px;
             border-radius: 8px;
             box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+            overflow-x: auto;
+            /* 小屏避免表格撑出屏幕 */
         }
 
         .cart table {
             width: 100%;
             border-collapse: collapse;
+            min-width: 480px;
+            /* 手机上可以左右滑动看完整表格 */
         }
 
         .cart th,
@@ -70,19 +108,28 @@
             padding: 8px;
             border-bottom: 1px solid #eee;
             text-align: left;
+            font-size: 14px;
+        }
+
+        .cart th {
+            background: #fafafa;
+            font-weight: 500;
         }
 
         .cart-total {
             text-align: right;
             margin-top: 10px;
             font-weight: bold;
+            font-size: 15px;
         }
 
+        /* ===== 客户信息表单 ===== */
         .customer-info {
             margin-top: 20px;
             display: grid;
-            grid-template-columns: 1fr;
-            gap: 10px;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            /* 桌面两列 */
+            gap: 10px 16px;
         }
 
         .customer-info label {
@@ -93,16 +140,19 @@
 
         .customer-info input {
             margin-top: 4px;
-            padding: 6px;
+            padding: 6px 8px;
             border-radius: 4px;
             border: 1px solid #ccc;
             font-size: 14px;
+            box-sizing: border-box;
         }
 
+        /* ===== 提交按钮 & 提示 ===== */
         .submit-btns {
             margin-top: 16px;
             display: flex;
             justify-content: flex-end;
+            gap: 8px;
         }
 
         .submit-btns button {
@@ -115,54 +165,139 @@
             color: #fff;
         }
 
+        .submit-btns button:active {
+            opacity: 0.9;
+        }
+
         .msg {
             margin-top: 10px;
             color: #e66;
             font-size: 14px;
         }
+
+        /* ================= 手机视角优化 ================= */
+        @media (max-width: 768px) {
+            body {
+                max-width: 100%;
+                padding: 12px 10px;
+            }
+
+            h1 {
+                font-size: 22px;
+                margin-bottom: 6px;
+            }
+
+            h2 {
+                font-size: 15px;
+                margin-bottom: 12px;
+            }
+
+            /* 商品：一列铺满屏幕 */
+            .products {
+                flex-direction: column;
+                align-items: stretch;
+                gap: 12px;
+            }
+
+            .product-card {
+                width: 100%;
+                max-width: none;
+                align-items: flex-start;
+            }
+
+            .product-card img {
+                margin-bottom: 6px;
+            }
+
+            /* 购物车卡片收紧一点 */
+            .cart {
+                padding: 12px;
+                margin-top: 18px;
+            }
+
+            .cart th,
+            .cart td {
+                padding: 6px;
+                font-size: 13px;
+            }
+
+            .cart-total {
+                font-size: 14px;
+            }
+
+            /* 客户信息：手机上一列竖排 */
+            .customer-info {
+                grid-template-columns: 1fr;
+                gap: 8px;
+            }
+
+            .customer-info input {
+                font-size: 16px;
+                /* 防止 iOS 自动放大 */
+            }
+
+            /* 按钮改成竖着排，宽度 100% */
+            .submit-btns {
+                flex-direction: column;
+                align-items: stretch;
+                margin-top: 14px;
+            }
+
+            .submit-btns button {
+                width: 100%;
+                font-size: 15px;
+                padding: 10px 0;
+            }
+
+            .msg {
+                font-size: 13px;
+            }
+        }
     </style>
+
 </head>
 
 <body>
-    <h1>Andmary新品下单</h1>
+    <div class="page-container">
+        <h1>Andmary新品下单</h1>
 
-    <h2>商品列表</h2>
-    <div class="products" id="products"></div>
+        <h2>商品列表</h2>
+        <div class="products" id="products"></div>
 
-    <div class="cart" id="cart">
-        <h2>购物车</h2>
-        <div id="cart-empty">购物车是空的</div>
-        <table id="cart-table" style="display:none;">
-            <thead>
-                <tr>
-                    <th>商品</th>
-                    <th>单价</th>
-                    <th>数量</th>
-                    <th>小计</th>
-                </tr>
-            </thead>
-            <tbody id="cart-body"></tbody>
-        </table>
-        <div class="cart-total" id="cart-total"></div>
+        <div class="cart" id="cart">
+            <h2>购物车</h2>
+            <div id="cart-empty">购物车是空的</div>
+            <table id="cart-table" style="display:none;">
+                <thead>
+                    <tr>
+                        <th>商品</th>
+                        <th>单价</th>
+                        <th>数量</th>
+                        <th>小计</th>
+                    </tr>
+                </thead>
+                <tbody id="cart-body"></tbody>
+            </table>
+            <div class="cart-total" id="cart-total"></div>
 
-        <!-- ✅ 只保留姓名 -->
-        <div class="customer-info">
-            <label>
-                姓名
-                <input type="text" id="customer-name" placeholder="请输入昵称 / 群名 / 姓名" />
-            </label>
+            <!-- ✅ 只保留姓名 -->
+            <div class="customer-info">
+                <label>
+                    姓名
+                    <input type="text" id="customer-name" placeholder="请输入昵称 / 群名 / 姓名" />
+                </label>
+            </div>
+
+            <!-- ✅ 一个下单按钮 -->
+            <div class="submit-btns">
+                <button onclick="submitOrder()">下 单</button>
+            </div>
+            <div class="msg" id="message"></div>
         </div>
 
-        <!-- ✅ 一个下单按钮 -->
-        <div class="submit-btns">
-            <button onclick="submitOrder()">下 单</button>
-        </div>
-        <div class="msg" id="message"></div>
+        <h2 style="margin-top:30px;">下单顺序（实时更新）</h2>
+        <div id="order-rank">加载中...</div>
     </div>
-
-    <h2 style="margin-top:30px;">下单顺序（实时更新）</h2>
-    <div id="order-rank">加载中...</div>
-
 
     <script>
         const API_BASE = ''; // 同一域名下，留空即可
